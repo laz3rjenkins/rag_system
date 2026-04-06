@@ -2,7 +2,7 @@ import bs4
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-import utils
+from src import utils as utils
 from config.config import CHROMA_PATH
 
 def get_text_from_web():
