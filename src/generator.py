@@ -9,7 +9,7 @@ from langchain_core.prompts import PromptTemplate
 def get_llm(model_path: str):
     return LlamaCpp(
         model_path=model_path,
-        n_ctx=4500,
+        n_ctx=5000,
         n_threads=8,
         temperature=0.3,
         max_tokens=700,

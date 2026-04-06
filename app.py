@@ -108,7 +108,10 @@ async def ask_llm(question: Question, db: Session = Depends(get_db)):
         # print("HERE ENDING TO GET CONTEXT ==================================")
         # print(docs)
         prompt = build_prompt(context, question.prompt)
+        print(f"Prompt: {prompt}")
+        print(len(context))
         bot_text = llm.invoke(prompt)
+        print(f"Bot text: {bot_text}")
 
         # 4. СОХРАНЯЕМ ОТВЕТ БОТА
         bot_msg = Message(chat_id=target_chat_id, sender="bot", text=bot_text)
