@@ -3,6 +3,7 @@ from langchain_chroma import Chroma
 from langchain_core.vectorstores.base import VectorStoreRetriever
 from config.config import CHROMA_PATH
 
+
 def get_retriever() -> VectorStoreRetriever:
     embeddings = utils.get_embeddings()
 
@@ -12,7 +13,8 @@ def get_retriever() -> VectorStoreRetriever:
         collection_name="rag_prompt_context"
     )
 
-    return vectorstore.as_retriever(search_kwargs={"k": 8})
+    return vectorstore.as_retriever(search_kwargs={"k": 1})
+
 
 def detect_query_intent(query: str) -> str:
     q = query.lower()
@@ -32,7 +34,7 @@ def detect_query_intent(query: str) -> str:
 def smart_retrieve(vectorstore: Chroma, query: str):
     intent = detect_query_intent(query)
 
-    k = 2 if intent != "general" else 2
+    k = 1 if intent != "general" else 1
 
     if intent in ["equipment", "procedure", "calculation"]:
         docs = vectorstore.similarity_search(

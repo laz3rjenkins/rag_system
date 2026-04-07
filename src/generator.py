@@ -1,5 +1,3 @@
-from langchain_community.llms import LlamaCpp
-from langchain_classic.chains import RetrievalQA
 from config.config import LLM_PATH
 from llama_cpp import Llama
 from langchain_community.llms import LlamaCpp
@@ -9,47 +7,36 @@ from langchain_core.prompts import PromptTemplate
 def get_llm(model_path: str):
     return LlamaCpp(
         model_path=model_path,
-        n_ctx=5000,
+        n_ctx=4096,
         n_threads=8,
-        temperature=0.3,
-        max_tokens=700,
-        repeat_penalty=1.3,
+        temperature=0.0,
+        max_tokens=300,
+        repeat_penalty=1.0,
         # top_p=0.95,
         # top_k=40,
-        verbose=False,
+        n_gpu_layers=-1,
+        verbose=True
     )
 
 
 def build_prompt(context: str, question: str) -> str:
     template = """
-    Ты консультант по нормативной документации и методикам испытаний.
+Извлеки только ответ на вопрос. 
+Никаких пояснений, цифр, символов или форматирования.
 
-    Отвечай СТРОГО по переданному контексту.
-    Не придумывай.
-    Не используй знания модели вне документа.
+Контекст:
+{context}
 
-    Если вопрос про испытания или измерения, отвечай в формате:
+Вопрос:
+{question}
 
-    1. Что подготовить
-    2. Оборудование / средства измерений
-    3. Последовательность действий
-    4. Важные условия и ограничения
-    5. Возможные ошибки / контроль качества
-
-    Если ответа нет — напиши:
-    "В документе нет точной информации по этому вопросу."
-
-    КОНТЕКСТ:
-    {context}
-
-    ВОПРОС:
-    {question}
-
-    ОТВЕТ:"""
+Краткий точный ответ:
+"""
     return PromptTemplate.from_template(template).format(
         context=context,
         question=question
     )
+
 
 def ask_llm_without_context(prompt: str):
     model_path = LLM_PATH
