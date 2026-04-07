@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: rag_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: lazer
+      MYSQL_DATABASE: mol_consultant_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rag_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag_api
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: lazer
+      DB_NAME: mol_consultant_db
+      LLM_PATH: /app/models/gpt-oss-20b-Q4_K_M.gguf
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-base
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  mariadb_data:

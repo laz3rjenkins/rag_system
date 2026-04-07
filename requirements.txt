@@ -95,3 +95,6 @@ mypy_extensions~=1.1.0
 httpx-sse~=0.4.3
 fastapi~=0.135.3
 pymupdf
+pymysql
+langchain_huggingface
+langchain_chroma
