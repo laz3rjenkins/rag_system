@@ -7,7 +7,7 @@ from langchain_core.prompts import PromptTemplate
 def get_llm(model_path: str):
     return LlamaCpp(
         model_path=model_path,
-        n_ctx=4096,
+        n_ctx=10000,
         n_threads=8,
         temperature=0.0,
         max_tokens=300,

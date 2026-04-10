@@ -13,7 +13,7 @@ def get_retriever() -> VectorStoreRetriever:
         collection_name="rag_prompt_context"
     )
 
-    return vectorstore.as_retriever(search_kwargs={"k": 1})
+    return vectorstore.as_retriever(search_kwargs={"k": 2})
 
 
 def detect_query_intent(query: str) -> str:
@@ -34,7 +34,7 @@ def detect_query_intent(query: str) -> str:
 def smart_retrieve(vectorstore: Chroma, query: str):
     intent = detect_query_intent(query)
 
-    k = 1 if intent != "general" else 1
+    k = 2 if intent != "general" else 2
 
     if intent in ["equipment", "procedure", "calculation"]:
         docs = vectorstore.similarity_search(

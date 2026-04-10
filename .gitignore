@@ -7,3 +7,5 @@ src/__pycache__
 config/__pycache__
 models/*.gguf
 .DS_Store
+context_log.txt
+prompt_log.txt

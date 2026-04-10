@@ -11,7 +11,9 @@ MARIADB_URL = f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/
 engine = create_engine(
     MARIADB_URL,
     pool_recycle=3600,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    pool_timeout=30,
+    max_overflow=10
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
