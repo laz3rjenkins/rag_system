@@ -2,7 +2,7 @@ import fitz  # pymupdf
 import re
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
-import utils
+from src import utils as utils
 from config.config import CHROMA_PATH
 
 TOP_SECTION_PATTERN = r'(?=^\d+\s+[А-ЯA-ZЁ])'
