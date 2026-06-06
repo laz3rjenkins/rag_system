@@ -9,7 +9,7 @@ from database import Message, Chat, get_db, init_db
 from src.retriever import get_retriever, smart_retrieve
 from src.ingester import parse_data
 from config.config import LLM_PATH, CHROMA_PATH
-from src.generator import get_llm, build_prompt
+from src.generator import get_llm, build_prompt, generate
 from langchain_chroma import Chroma
 
 
@@ -54,8 +54,10 @@ class Question(BaseModel):
     chat_id: Optional[str] = None
 
 
+# sync def: FastAPI выполняет такие эндпоинты в пуле потоков и не блокирует
+# event loop на время (потенциально долгой) генерации/обращений к БД.
 @app.post("/ask")
-async def ask_llm(question: Question, db: Session = Depends(get_db)):
+def ask_llm(question: Question, db: Session = Depends(get_db)):
     global vectorstore, llm
 
     target_chat_id = None
@@ -107,7 +109,7 @@ async def ask_llm(question: Question, db: Session = Depends(get_db)):
 
         write_log(prompt, "prompt_log.txt")
 
-        bot_text = llm.invoke(prompt)
+        bot_text = generate(llm, prompt)
 
         # 4. СОХРАНЯЕМ ОТВЕТ БОТА
         bot_msg = Message(chat_id=target_chat_id, sender="bot", text=bot_text)
@@ -127,7 +129,7 @@ async def ask_llm(question: Question, db: Session = Depends(get_db)):
 
 # Эндпоинт для получения списка чатов в сайдбар
 @app.get("/chats")
-async def get_chats(db: Session = Depends(get_db)):
+def get_chats(db: Session = Depends(get_db)):
     chats = db.query(Chat).order_by(Chat.created_at.desc()).all()
 
     return chats
@@ -135,7 +137,7 @@ async def get_chats(db: Session = Depends(get_db)):
 
 # Эндпоинt для загрузки истории конкретного чата
 @app.get("/chats/{chat_id}")
-async def get_chat_history(chat_id: str, db: Session = Depends(get_db)):
+def get_chat_history(chat_id: str, db: Session = Depends(get_db)):
     messages = db.query(Message).filter(Message.chat_id == chat_id).order_by(Message.created_at.asc()).all()
 
     return messages

@@ -1,11 +1,22 @@
-import fitz  # pymupdf
+import hashlib
 import re
+from pathlib import Path
+
+import fitz  # pymupdf
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
+
 from src import utils as utils
-from config.config import CHROMA_PATH
+from config.config import CHROMA_PATH, CHROMA_COLLECTION, DATA_DIR
 
 TOP_SECTION_PATTERN = r'(?=^\d+\.?\s+[А-ЯA-ZЁ])'
+
+# Колонтитул/футер вида "ГОСТ ISO 9612-2016" — строка, целиком состоящая из
+# обозначения ГОСТ (возможно с годом). Обобщено, не привязано к одному документу.
+RUNNING_HEADER_PATTERN = re.compile(
+    r'^ГОСТ\s+(?:ISO|ИСО|Р|EN)?\s*[\d.\-—:]+(?:\s*[-—]\s*\d{2,4})?$',
+    re.IGNORECASE,
+)
 
 
 def split_top_sections(text: str):
@@ -33,12 +44,12 @@ def clean_page_text(text: str) -> str:
         if not line:
             continue
 
-        # page number
+        # номер страницы
         if re.fullmatch(r"\d+", line):
             continue
 
-        # header/footer ГОСТ
-        if re.search(r"ГОСТ\s+ISO\s+9612", line):
+        # колонтитул/футер с обозначением ГОСТ (для любого документа)
+        if RUNNING_HEADER_PATTERN.match(line):
             continue
 
         lines.append(line)
@@ -110,29 +121,52 @@ def extract_documents_from_pdf(path: str):
     return documents
 
 
-def parse_data():
-    documents = extract_documents_from_pdf("data/4293750815.pdf")
+def _doc_id(source: str, section_index: int) -> str:
+    # Детерминированный id: один и тот же раздел одного файла всегда даёт один id.
+    return hashlib.md5(f"{source}|{section_index}".encode("utf-8")).hexdigest()
 
-    # for debug
-    # for i, doc in enumerate(documents):
-    #     print(f"\n--- CHUNK {i} ---")
-    #     print(doc.page_content)
-    #
-    # exit(0)
+
+def index_pdf(vectorstore: Chroma, path: str) -> int:
+    documents = extract_documents_from_pdf(path)
+    if not documents:
+        print(f"[ingest] {path}: разделов не найдено, пропуск")
+        return 0
+
+    ids = [_doc_id(path, d.metadata["section_index"]) for d in documents]
+
+    # Дедуп: удаляем прежние вектора этого источника перед повторной индексацией
+    # (корректно обрабатывает изменённые и удалённые разделы).
+    existing = vectorstore.get(where={"source": path})
+    if existing and existing.get("ids"):
+        vectorstore.delete(ids=existing["ids"])
+
+    vectorstore.add_documents(documents, ids=ids)
+    print(f"[ingest] {path}: проиндексировано разделов: {len(documents)}")
+    return len(documents)
+
+
+def parse_data():
+    data_dir = Path(DATA_DIR)
+    pdf_files = sorted(data_dir.glob("*.pdf"))
+
+    if not pdf_files:
+        print(f"[ingest] В {data_dir} не найдено PDF-файлов")
+        return
 
     embeddings = utils.get_embeddings()
 
     vectorstore = Chroma(
         persist_directory=CHROMA_PATH,
         embedding_function=embeddings,
-        collection_name="rag_prompt_context"
+        collection_name=CHROMA_COLLECTION,
     )
 
-    vectorstore.add_documents(documents)
+    total = 0
+    for pdf in pdf_files:
+        total += index_pdf(vectorstore, str(pdf))
 
-    print(f"Indexed {len(documents)} sections")
+    print(f"[ingest] Готово. Файлов: {len(pdf_files)}, разделов всего: {total}")
 
 
 if __name__ == "__main__":
     parse_data()
-

@@ -9,3 +9,4 @@ models/*.gguf
 .DS_Store
 context_log.txt
 prompt_log.txt
+report.txt

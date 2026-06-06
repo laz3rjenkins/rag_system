@@ -1,64 +1,69 @@
-from config.config import LLM_PATH
-from llama_cpp import Llama
-from langchain_community.llms import LlamaCpp
+import threading
+
+from langchain_community.llms.llamacpp import LlamaCpp
+from transformers import AutoTokenizer
 from langchain_core.prompts import PromptTemplate
 
+tok = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct")
 
-def get_llm(model_path: str):
+from config.config import (
+    LLM_PATH,
+    LLM_N_CTX,
+    LLM_N_THREADS,
+    LLM_N_GPU_LAYERS,
+    LLM_MAX_TOKENS,
+    LLM_TEMPERATURE,
+    LLM_REPEAT_PENALTY,
+)
+
+# llama_cpp.Llama не потокобезопасна. Эндпоинты работают в пуле потоков FastAPI,
+# поэтому доступ к единственному инстансу модели сериализуем этим локом.
+_llm_lock = threading.Lock()
+
+
+def get_llm(model_path: str = LLM_PATH) -> LlamaCpp:
     return LlamaCpp(
         model_path=model_path,
-        n_ctx=11201,
-        n_threads=8,
-        temperature=0.0,
-        max_tokens=300,
-        repeat_penalty=1.0,
-        # top_p=0.95,
-        # top_k=40,
-        n_gpu_layers=-1,
-        verbose=True
+        n_ctx=LLM_N_CTX,
+        n_threads=LLM_N_THREADS,
+        n_gpu_layers=LLM_N_GPU_LAYERS,
+        temperature=LLM_TEMPERATURE,
+        max_tokens=LLM_MAX_TOKENS,
+        repeat_penalty=LLM_REPEAT_PENALTY,
+        verbose=True,
     )
 
+
+def generate(llm: LlamaCpp, prompt: str) -> str:
+    """Потокобезопасный вызов LLM: один инстанс, сериализованный доступ."""
+    with _llm_lock:
+        return llm.invoke(prompt)
+
+
+# def build_prompt(context: str, question: str) -> str:
+#     template = """
+# Извлеки только ответ на вопрос.
+# Никаких пояснений, цифр, символов или форматирования.
+#
+# Контекст:
+# {context}
+#
+# Вопрос:
+# {question}
+#
+# Краткий точный ответ:
+# """
+#     return PromptTemplate.from_template(template).format(
+#         context=context,
+#         question=question
+#     )
 
 def build_prompt(context: str, question: str) -> str:
-    template = """
-Извлеки только ответ на вопрос. 
-Никаких пояснений, цифр, символов или форматирования.
-
-Контекст:
-{context}
-
-Вопрос:
-{question}
-
-Краткий точный ответ:
-"""
-    return PromptTemplate.from_template(template).format(
-        context=context,
-        question=question
-    )
-
-
-def ask_llm_without_context(prompt: str):
-    model_path = LLM_PATH
-    llm = Llama(
-        model_path=model_path,
-        n_ctx=8192,  # Увеличиваем контекст (Gemini умеет в огромные окна, 4096 — маловато)
-        n_threads=8,
-        temperature=0.7,  # Gemini обычно работает в диапазоне 0.7-0.8
-        max_tokens=2048,  # КЛЮЧЕВОЙ ПАРАМЕТР: разрешаем модели писать длинные ответы
-        repeat_penalty=1.18,  # Чтобы не зацикливалась (стандарт для современных LLM)
-        top_p=0.95,  # Добавляет "разумности" и разнообразия, как у Google
-        top_k=40,
-        verbose=False,
-    )
-
-    result = llm(
-        prompt,
-        max_tokens=2048,
-        stop=["<END>"]
-    )
-
-    output = result["choices"][0]["text"].strip()
-
-    res = {'result': output}
-    return res
+    global tok
+    messages = [
+        {"role": "system", "content":
+            "Отвечай только на основе контекста, кратко, сохраняя обозначения стандартов."},
+        {"role": "user", "content":
+            f"Контекст:\n{context}\n\nВопрос:\n{question}\n\nКраткий точный ответ:"},
+    ]
+    return tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)

@@ -27,16 +27,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Обновляем pip
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-ENV CMAKE_ARGS="-DGGML_CUDA=on"
-ENV FORCE_CMAKE=1
+COPY requirements_gpu.txt .
 
-COPY requirements.txt .
+# Зависимости БЕЗ llama-cpp-python (его нет в requirements_gpu.txt).
+RUN python3 -m pip install --no-cache-dir -r requirements_gpu.txt
 
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+# llama-cpp-python с CUDA — из готовых wheel'ов, БЕЗ компиляции из исходников.
+# cu124 соответствует базовому образу nvidia/cuda:12.4.1. Это убирает
+# ~48-минутную сборку и падение на компиляции tools/mtmd (mtmd-cli.cpp).
+RUN python3 -m pip install --no-cache-dir --prefer-binary llama-cpp-python \
+    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
 
 RUN python3 -m pip install --no-cache-dir sentence-transformers
-
-# RUN python3 -m pip install --no-cache-dir --force-reinstall --upgrade llama-cpp-python
 
 COPY . .
 
