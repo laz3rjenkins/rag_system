@@ -4,6 +4,7 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma
 from src import utils as utils
 from config.config import CHROMA_PATH
+import os
 
 TOP_SECTION_PATTERN = r'(?=^\d+\.?\s+[А-ЯA-ZЁ])'
 
@@ -109,16 +110,21 @@ def extract_documents_from_pdf(path: str):
 
     return documents
 
+def get_filelist():
+    # Путь к папке
+    folder_path = '../data'
+
+    # Получить список всех файлов и папок
+    all_entries = os.listdir(folder_path)
+    # Отфильтровать, оставив только файлы
+    files = [entry for entry in all_entries if os.path.isfile(os.path.join(folder_path, entry)) and ".pdf" in entry]
+    # all_gosts = [pdf_file for pdf_file in all_entries if ".pdf" in pdf_file]
+
+    return files
+
 
 def parse_data():
-    documents = extract_documents_from_pdf("data/4293750815.pdf")
-
-    # for debug
-    # for i, doc in enumerate(documents):
-    #     print(f"\n--- CHUNK {i} ---")
-    #     print(doc.page_content)
-    #
-    # exit(0)
+    pdf_files = get_filelist()
 
     embeddings = utils.get_embeddings()
 
@@ -127,10 +133,11 @@ def parse_data():
         embedding_function=embeddings,
         collection_name="rag_prompt_context"
     )
+    for pdf in pdf_files:
+        documents = extract_documents_from_pdf(f"../data/{pdf}")
 
-    vectorstore.add_documents(documents)
-
-    print(f"Indexed {len(documents)} sections")
+        vectorstore.add_documents(documents)
+        print(f"Indexed {len(documents)} sections")
 
 
 if __name__ == "__main__":
